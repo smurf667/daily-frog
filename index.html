@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Daily Frog</title>
+<meta name="description" content="A tiny timer: keep the frog alive by finishing before the time limit.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <header class="top">
+    <h1>daily frog</h1>
+    <div class="limit" role="group" aria-label="Time limit per round">
+      <span class="limit-label">limit</span>
+      <button id="limitDown" class="icon-btn" type="button" aria-label="Decrease time limit by 30 seconds">&minus;</button>
+      <output id="limitValue" aria-live="polite">2:30</output>
+      <button id="limitUp" class="icon-btn" type="button" aria-label="Increase time limit by 30 seconds">+</button>
+    </div>
+  </header>
+
+  <div class="clock">
+    <div id="timer" class="timer">0:00</div>
+    <div id="status" class="status" aria-live="polite">ready when you are</div>
+    <div id="roundLabel" class="round">round 1</div>
+  </div>
+
+  <section class="stage">
+    <svg id="scene" viewBox="0 0 400 520" preserveAspectRatio="xMidYMid meet" role="img" aria-label="A frog sitting in a glass of water">
+      <defs>
+        <clipPath id="glassClip">
+          <path d="M85 200 L100 468 Q102 490 126 490 L274 490 Q298 490 300 468 L315 200 Z"/>
+        </clipPath>
+        <linearGradient id="waterGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#9adcff" stop-opacity=".5"/>
+          <stop offset="1" stop-color="#3f9fdc" stop-opacity=".72"/>
+        </linearGradient>
+
+        <!-- hind leg (left side); mirrored with scale(-1 1) for the right -->
+        <g id="hindleg">
+          <circle class="body" cx="-106" cy="108" r="7"/>
+          <circle class="body" cx="-98" cy="116" r="7"/>
+          <circle class="body" cx="-88" cy="121" r="7"/>
+          <ellipse class="body" cx="-78" cy="109" rx="30" ry="11"/>
+          <ellipse class="body" cx="-58" cy="72" rx="30" ry="38" transform="rotate(25 -58 72)"/>
+        </g>
+        <!-- front arm -->
+        <g id="arm">
+          <ellipse class="body" cx="-42" cy="92" rx="11" ry="24" transform="rotate(8 -42 92)"/>
+          <ellipse class="body" cx="-46" cy="116" rx="16" ry="8"/>
+        </g>
+        <g id="eyeBump">
+          <circle class="body" cx="-40" cy="-54" r="22"/>
+        </g>
+      </defs>
+
+      <ellipse cx="200" cy="503" rx="125" ry="10" fill="rgba(20,60,60,.18)"/>
+
+      <text id="cookedText" x="200" y="150" text-anchor="middle">you're cooked!</text>
+
+      <!-- back of the glass -->
+      <path d="M85 200 L100 468 Q102 490 126 490 L274 490 Q298 490 300 468 L315 200 Z" fill="rgba(255,255,255,.12)"/>
+
+      <!-- frog -->
+      <g id="frog">
+        <use href="#hindleg"/>
+        <use href="#hindleg" transform="scale(-1 1)"/>
+        <ellipse class="body" cx="0" cy="45" rx="60" ry="60"/>
+        <ellipse class="belly" cx="0" cy="58" rx="38" ry="44"/>
+        <use href="#arm"/>
+        <use href="#arm" transform="scale(-1 1)"/>
+        <ellipse class="body" cx="0" cy="-16" rx="68" ry="44"/>
+        <use href="#eyeBump"/>
+        <use href="#eyeBump" transform="scale(-1 1)"/>
+
+        <!-- eyes -->
+        <g transform="translate(-40 -54)">
+          <circle r="15" fill="#fff"/>
+          <ellipse class="pupil" rx="4.5" ry="11" cy="1" fill="#1b1b1b"/>
+          <g class="lid" transform="translate(0 -17) scale(1 0)"><ellipse class="lidshape" cx="0" cy="17" rx="17.5" ry="17.5"/></g>
+          <path class="xmark" d="M-9 -9 L9 9 M9 -9 L-9 9"/>
+        </g>
+        <g transform="translate(40 -54)">
+          <circle r="15" fill="#fff"/>
+          <ellipse class="pupil" rx="4.5" ry="11" cy="1" fill="#1b1b1b"/>
+          <g class="lid" transform="translate(0 -17) scale(1 0)"><ellipse class="lidshape" cx="0" cy="17" rx="17.5" ry="17.5"/></g>
+          <path class="xmark" d="M-9 -9 L9 9 M9 -9 L-9 9"/>
+        </g>
+
+        <circle cx="-9" cy="-34" r="2.6" fill="var(--frog-dark)"/>
+        <circle cx="9" cy="-34" r="2.6" fill="var(--frog-dark)"/>
+        <path id="mouth" d="M-28 4 Q0 26 28 4" fill="none" stroke="var(--frog-dark)" stroke-width="3.5" stroke-linecap="round"/>
+      </g>
+
+      <!-- water + bubbles -->
+      <g clip-path="url(#glassClip)">
+        <path id="water" fill="url(#waterGrad)"/>
+        <g id="bubbles"></g>
+      </g>
+
+      <!-- glass front -->
+      <path d="M85 200 L100 468 Q102 490 126 490 L274 490 Q298 490 300 468 L315 200" fill="none" stroke="rgba(25,85,105,.35)" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="M85 200 L100 468 Q102 490 126 490 L274 490 Q298 490 300 468 L315 200" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="M106 232 L114 430" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="7" stroke-linecap="round"/>
+      <path d="M118 448 L120 456" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="7" stroke-linecap="round"/>
+    </svg>
+  </section>
+
+  <footer class="controls">
+    <button id="startStop" class="btn primary" type="button">Start</button>
+    <button id="next" class="btn" type="button" disabled>Next</button>
+    <button id="finish" class="btn ghost" type="button">Finish</button>
+  </footer>
+</div>
+
+<div id="summary" class="overlay" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="summaryTitle">
+    <h2 id="summaryTitle">summary</h2>
+    <div class="tally">
+      <div class="tally-box alive"><span id="aliveCount">0</span><small>alive</small></div>
+      <div class="tally-box cooked"><span id="cookedCount">0</span><small>cooked</small></div>
+    </div>
+    <p id="summaryEmpty" class="empty" hidden>No rounds were played.</p>
+    <ol id="roundList" class="round-list"></ol>
+    <button id="newSession" class="btn primary" type="button">New session</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
