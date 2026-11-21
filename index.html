@@ -6,25 +6,38 @@
 <title>Daily Frog</title>
 <meta name="description" content="A tiny timer: keep the frog alive by finishing before the time limit.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app">
 
   <header class="top">
-    <h1>daily frog</h1>
+    <div class="brand">
+      <h1>Daily Frog</h1>
+      <a class="improve-link" href="https://github.com/smurf667/daily-frog" target="_blank" rel="noopener noreferrer">Improve this</a>
+    </div>
     <div class="limit" role="group" aria-label="Time limit per round">
-      <span class="limit-label">limit</span>
-      <button id="limitDown" class="icon-btn" type="button" aria-label="Decrease time limit by 30 seconds">&minus;</button>
-      <output id="limitValue" aria-live="polite">2:30</output>
-      <button id="limitUp" class="icon-btn" type="button" aria-label="Increase time limit by 30 seconds">+</button>
+      <div class="limit-controls">
+        <div class="limit-stepper">
+          <button id="limitDown" class="icon-btn" type="button" aria-label="Decrease time limit by 30 seconds">&minus;</button>
+          <div class="limit-display">
+            <output id="limitValue" aria-live="polite">2:30</output>
+            <span class="limit-label">Limit</span>
+          </div>
+          <button id="limitUp" class="icon-btn" type="button" aria-label="Increase time limit by 30 seconds">+</button>
+        </div>
+        <button id="soundToggle" class="icon-btn sound-btn" type="button" aria-label="Enable sound" aria-pressed="false">&#x1F507;</button>
+      </div>
     </div>
   </header>
 
   <div class="clock">
     <div id="timer" class="timer">0:00</div>
-    <div id="status" class="status" aria-live="polite">ready when you are</div>
-    <div id="roundLabel" class="round">round 1</div>
+    <div id="status" class="status" aria-live="polite">Ready when you are</div>
+    <div id="roundLabel" class="round">Round 1</div>
   </div>
 
   <section class="stage">
@@ -58,7 +71,7 @@
 
       <ellipse cx="200" cy="503" rx="125" ry="10" fill="rgba(20,60,60,.18)"/>
 
-      <text id="cookedText" x="200" y="150" text-anchor="middle">you're cooked!</text>
+      <text id="cookedText" x="200" y="150" text-anchor="middle">You're cooked!</text>
 
       <!-- back of the glass -->
       <path d="M85 200 L100 468 Q102 490 126 490 L274 490 Q298 490 300 468 L315 200 Z" fill="rgba(255,255,255,.12)"/>
@@ -117,10 +130,10 @@
 
 <div id="summary" class="overlay" hidden>
   <div class="card" role="dialog" aria-modal="true" aria-labelledby="summaryTitle">
-    <h2 id="summaryTitle">summary</h2>
+    <h2 id="summaryTitle">Summary</h2>
     <div class="tally">
-      <div class="tally-box alive"><span id="aliveCount">0</span><small>alive</small></div>
-      <div class="tally-box cooked"><span id="cookedCount">0</span><small>cooked</small></div>
+      <div class="tally-box alive"><span id="aliveCount">0</span><small>Alive</small></div>
+      <div class="tally-box cooked"><span id="cookedCount">0</span><small>Cooked</small></div>
     </div>
     <p id="summaryEmpty" class="empty" hidden>No rounds were played.</p>
     <ol id="roundList" class="round-list"></ol>

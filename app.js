@@ -7,6 +7,27 @@
   const MAX_LIMIT = 3600;
   const DEFAULT_LIMIT = 150;    // 2:30
   const BUBBLE_DELAY = 30;      // no bubbles during the first 30 s
+  const RUNNING_MESSAGES = [
+    'Rolling along',
+    'On we go',
+    'All good',
+    'Finding our flow',
+    'Smooth sailing',
+    'Winging it',
+  ];
+  const SUCCESS_MESSAGES = [
+    'Nailed it!',
+    'All done!',
+    'Nice work!',
+    'You did it!',
+    "That's a win!",
+    'You rule!',
+  ];
+  const COOKED_MESSAGES = [
+    "Well, that's a croak!",
+    'Boiling point!',
+    'Froggy flambé!',
+  ];
   const SURFACE_Y = 340;        // water level in SVG units
   const BUBBLE_START_Y = 478;
   const MAX_RATE = 14;          // bubbles per second at maximum
@@ -27,16 +48,25 @@
   const mouthEl = $('mouth');
   const lids = [...scene.querySelectorAll('.lid')];
   const pupils = [...scene.querySelectorAll('.pupil')];
+  const cookedText = $('cookedText');
   const timerEl = $('timer');
   const statusEl = $('status');
   const roundLabel = $('roundLabel');
   const limitValue = $('limitValue');
   const limitDown = $('limitDown');
   const limitUp = $('limitUp');
+  const soundToggle = $('soundToggle');
   const startStop = $('startStop');
   const nextBtn = $('next');
   const finishBtn = $('finish');
   const summaryEl = $('summary');
+  const bubblesAudio = new Audio('bubbles.mp3');
+  const cryAudio = new Audio('cry.mp3');
+  const blinkAudio = new Audio('blink.mp3');
+  bubblesAudio.loop = true;
+  bubblesAudio.preload = 'auto';
+  cryAudio.preload = 'auto';
+  blinkAudio.preload = 'auto';
 
   // ---------- 1-D Perlin (gradient) noise ----------
   function makeNoise(seed) {
@@ -62,9 +92,17 @@
 
   let elapsedMs = 0;
   let running = false;
+  let sessionStarted = false;
+  let soundEnabled = false;
+  let audioUnlocked = false;
+  let bubblesPlaybackRequested = false;
+  let bubbleSoundStartMs = null;
+  let runningMessage = '';
+  let successMessage = '';
   let startedAt = 0;
   const rounds = [];
 
+  const choose = (options) => options[Math.floor(Math.random() * options.length)];
   const fmt = (sec) => {
     sec = Math.max(0, Math.floor(sec));
     return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
@@ -74,13 +112,19 @@
   // ---------- controls ----------
   function start() {
     if (running) return;
+    audioUnlocked = true;
+    sessionStarted = true;
     running = true;
+    runningMessage = choose(RUNNING_MESSAGES);
     startedAt = performance.now() - elapsedMs;
+    syncBubbleSound();
   }
   function stop() {
     if (!running) return;
     elapsedMs = Math.max(0, performance.now() - startedAt);
     running = false;
+    if (elapsedMs > 0) successMessage = choose(SUCCESS_MESSAGES);
+    syncBubbleSound();
   }
   function resetRound() {
     running = false;
@@ -88,6 +132,9 @@
     bubbles.forEach((b) => b.el.remove());
     bubbles.length = 0;
     spawnAcc = 0;
+    bubblesAudio.currentTime = 0;
+    bubbleSoundStartMs = null;
+    syncBubbleSound();
   }
   function recordRound() {
     if (elapsedMs <= 0) return;
@@ -98,11 +145,37 @@
     try { localStorage.setItem('dailyfrog.limit', String(limit)); } catch (e) { /* ignore */ }
   }
 
+  function reportAudioError(name, error) {
+    console.error('Unable to play ' + name + ':', error);
+  }
+  function syncBubbleSound() {
+    if (!soundEnabled || summaryEl.hidden === false || !sessionStarted) {
+      bubblesAudio.pause();
+      bubblesPlaybackRequested = false;
+      return;
+    }
+    if (bubbleSoundStartMs === null) {
+      bubblesAudio.volume = 0;
+    } else {
+      const duration = limit * 1000 - bubbleSoundStartMs;
+      const progress = duration <= 0
+        ? Number(elapsedMs > bubbleSoundStartMs)
+        : Math.min(1, Math.max(0, (elapsedMs - bubbleSoundStartMs) / duration));
+      bubblesAudio.volume = 0.1 + progress * 0.9;
+    }
+    if (bubblesAudio.paused && !bubblesPlaybackRequested) {
+      bubblesPlaybackRequested = true;
+      const playback = bubblesAudio.play();
+      if (playback) playback.catch((error) => reportAudioError('bubbles.mp3', error));
+    }
+  }
+
   startStop.addEventListener('click', () => (running ? stop() : start()));
   nextBtn.addEventListener('click', () => {
     stop();
     recordRound();
     resetRound();
+    start();
   });
   finishBtn.addEventListener('click', () => {
     stop();
@@ -110,12 +183,28 @@
     resetRound();
     showSummary();
   });
-  limitDown.addEventListener('click', () => setLimit(limit - STEP));
-  limitUp.addEventListener('click', () => setLimit(limit + STEP));
+  limitDown.addEventListener('click', () => { if (!sessionStarted) setLimit(limit - STEP); });
+  limitUp.addEventListener('click', () => { if (!sessionStarted) setLimit(limit + STEP); });
+  soundToggle.addEventListener('click', () => {
+    audioUnlocked = true;
+    soundEnabled = !soundEnabled;
+    soundToggle.textContent = soundEnabled ? '\u{1F508}' : '\u{1F507}';
+    soundToggle.setAttribute('aria-label', soundEnabled ? 'Disable sound' : 'Enable sound');
+    soundToggle.setAttribute('aria-pressed', String(soundEnabled));
+    if (!soundEnabled) {
+      bubblesAudio.pause();
+      bubblesAudio.currentTime = 0;
+      bubblesPlaybackRequested = false;
+      return;
+    }
+    syncBubbleSound();
+  });
   $('newSession').addEventListener('click', () => {
     rounds.length = 0;
     resetRound();
+    sessionStarted = false;
     summaryEl.hidden = true;
+    syncBubbleSound();
   });
 
   function showSummary() {
@@ -133,11 +222,13 @@
       time.textContent = fmt(r.elapsed / 1000) + ' / ' + fmt(r.limit / 1000);
       const res = document.createElement('span');
       res.className = r.alive ? 'ok' : 'bad';
-      res.textContent = r.alive ? 'alive' : 'cooked';
+      res.textContent = r.alive ? 'Alive' : 'Cooked';
       li.append(name, time, res);
       list.appendChild(li);
     });
     summaryEl.hidden = false;
+    bubblesAudio.pause();
+    bubblesPlaybackRequested = false;
   }
 
   // ---------- UI sync (only touches the DOM on change) ----------
@@ -150,18 +241,18 @@
     timerEl.classList.toggle('over', cooked);
     document.body.classList.toggle('cooked', cooked);
     setText('limit', limitValue, fmt(limit));
-    setText('round', roundLabel, 'round ' + (rounds.length + 1));
+    setText('round', roundLabel, 'Round ' + (rounds.length + 1));
 
     let status;
-    if (cooked) status = 'overtime';
-    else if (running) status = 'winging it...';
-    else if (elapsedMs > 0) status = 'you did it!';
-    else status = 'ready when you are';
+    if (cooked) status = 'Overtime';
+    else if (running) status = runningMessage;
+    else if (elapsedMs > 0) status = successMessage;
+    else status = 'Ready when you are';
     setText('status', statusEl, status);
 
     setText('startStop', startStop, running ? 'Stop' : (elapsedMs > 0 ? 'Resume' : 'Start'));
     startStop.classList.toggle('running', running);
-    const locked = running || elapsedMs > 0;
+    const locked = sessionStarted;
     setDisabled('ld', limitDown, locked || limit <= MIN_LIMIT);
     setDisabled('lu', limitUp, locked || limit >= MAX_LIMIT);
     setDisabled('next', nextBtn, elapsedMs <= 0);
@@ -173,6 +264,7 @@
   let colorT = 0;          // 0 green .. 1 red
   let lastColorT = -1;
   let lastCooked = null;
+  let previousCooked = false;
   let blinkAt = 1.5;
   let blinkStart = -1;
   let lastLid = -1;
@@ -207,12 +299,26 @@
       lastCooked = cooked;
       scene.classList.toggle('cooked', cooked);
       mouthEl.setAttribute('d', cooked ? 'M-24 20 Q0 2 24 20' : 'M-28 4 Q0 26 28 4');
+      if (cooked) cookedText.textContent = choose(COOKED_MESSAGES);
     }
+    if (cooked && !previousCooked && soundEnabled && audioUnlocked) {
+      cryAudio.currentTime = 0;
+      const playback = cryAudio.play();
+      if (playback) playback.catch((error) => reportAudioError('cry.mp3', error));
+    }
+    previousCooked = cooked;
 
     // blinking
     let lid = 0;
     if (!cooked) {
-      if (blinkStart < 0 && time >= blinkAt) blinkStart = time;
+      if (blinkStart < 0 && time >= blinkAt) {
+        blinkStart = time;
+        if (soundEnabled && audioUnlocked) {
+          blinkAudio.currentTime = 0;
+          const playback = blinkAudio.play();
+          if (playback) playback.catch((error) => reportAudioError('blink.mp3', error));
+        }
+      }
       if (blinkStart >= 0) {
         const p = (time - blinkStart) / BLINK_DUR;
         if (p >= 1) {
@@ -259,6 +365,10 @@
   }
 
   function spawnBubble(p) {
+    if (bubbleSoundStartMs === null) {
+      bubbleSoundStartMs = elapsedMs;
+      syncBubbleSound();
+    }
     const el = document.createElementNS(SVG_NS, 'circle');
     el.setAttribute('class', 'bubble');
     const r = 2.5 + Math.random() * 4 + p * 2.5;
@@ -308,6 +418,7 @@
 
     const cooked = isCooked();
     const time = now / 1000;
+    syncBubbleSound();
     updateUI(cooked);
     animateFrog(time, dt, cooked);
     animateWater(time);
