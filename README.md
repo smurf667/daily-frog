@@ -1,6 +1,7 @@
 # Daily Frog
 
 A client-side playful helper to keep the time in a daily scrum.
+It's alive at https://smurf667.github.io/daily-frog/
 
 Plain static files: no build step, no dependencies, no network requests except for initial loading.
 
