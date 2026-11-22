@@ -39,7 +39,7 @@ body.cooked { background-color: #f0b5a4; }
   justify-content: space-between;
   gap: 12px;
 }
-h1 { margin: 0; font-size: clamp(1.1rem, 4vmin, 1.5rem); font-weight: 800; letter-spacing: .02em; }
+h1 { margin: 0; font-size: clamp(1.5rem, 6vmin, 2rem); font-weight: 900; letter-spacing: .02em; }
 .brand { display: flex; flex-direction: column; align-items: flex-start; }
 .improve-link { font-size: .75rem; line-height: 1.2; color: inherit; opacity: .7; }
 .improve-link:hover { opacity: 1; }
@@ -73,7 +73,8 @@ h1 { margin: 0; font-size: clamp(1.1rem, 4vmin, 1.5rem); font-weight: 800; lette
   transition: color .4s;
 }
 .timer.over { color: var(--danger); }
-.status { min-height: 1.5em; font-size: clamp(1rem, 3.4vmin, 1.3rem); font-weight: 600; }
+.status { min-height: 1.5em; font-size: clamp(1rem, 3.4vmin, 1.3rem); font-weight: 600; transition: opacity .25s ease; }
+.status.fading { opacity: 0; }
 .round { font-size: .8rem; opacity: .6; }
 
 .stage {

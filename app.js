@@ -6,7 +6,10 @@
   const MIN_LIMIT = 30;
   const MAX_LIMIT = 3600;
   const DEFAULT_LIMIT = 150;    // 2:30
-  const BUBBLE_DELAY = 30;      // no bubbles during the first 30 s
+  const BUBBLE_DELAY = 25;      // no bubbles during the first 25s
+  const BUBBLE_SOUND_FADE_MS = 800;
+  const RUNNING_MESSAGE_INTERVAL = 20_000;
+  const RUNNING_MESSAGE_FADE_MS = 250;
   const RUNNING_MESSAGES = [
     'Rolling along',
     'On we go',
@@ -14,6 +17,16 @@
     'Finding our flow',
     'Smooth sailing',
     'Winging it',
+    'Keeping it crisp',
+    'Locked in',
+    'Making good time',
+    'In the groove',
+    'Taking the mic',
+    'Steady pace',
+    'Right on track',
+    'Sharing the highlights',
+    'Easy does it',
+    'Cruising through',
   ];
   const SUCCESS_MESSAGES = [
     'Nailed it!',
@@ -22,17 +35,32 @@
     'You did it!',
     "That's a win!",
     'You rule!',
+    'Short and sweet!',
+    'Right on time!',
+    'Crushed it!',
+    'Spot on!',
+    'Smooth landing!',
+    'Mic drop!',
+    'Clean sweep!',
   ];
   const COOKED_MESSAGES = [
     "Well, that's a croak!",
     'Boiling point!',
     'Froggy flambé!',
+    'Overcooked!',
+    'Simmer down!',
+    'Too hot to hop!',
+    'Literally well done!',
+    'Steamed!',
+    'Frog legs on the menu!',
+    'Turn down the heat!',
   ];
-  const SURFACE_Y = 340;        // water level in SVG units
+  const SURFACE_Y = 218;        // water level in SVG units
   const BUBBLE_START_Y = 478;
   const MAX_RATE = 14;          // bubbles per second at maximum
   const MAX_BUBBLES = 90;
   const FROG_CY = 385;          // frog centre (resting)
+  const FROG_FLIP_RISE = 86.6;  // raises the feet to the waterline when fully flipped
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -97,7 +125,11 @@
   let audioUnlocked = false;
   let bubblesPlaybackRequested = false;
   let bubbleSoundStartMs = null;
+  let bubbleSoundFadeStartedAt = null;
+  let bubbleSoundFadeStartVolume = 0;
   let runningMessage = '';
+  let nextRunningMessageAt = 0;
+  let runningMessageTimeout = null;
   let successMessage = '';
   let startedAt = 0;
   const rounds = [];
@@ -110,20 +142,49 @@
   const isCooked = () => elapsedMs > 0 && elapsedMs >= limit * 1000;
 
   // ---------- controls ----------
+  function clearRunningMessageFade() {
+    if (runningMessageTimeout !== null) {
+      clearTimeout(runningMessageTimeout);
+      runningMessageTimeout = null;
+    }
+    statusEl.classList.remove('fading');
+  }
+
+  function rotateRunningMessage() {
+    statusEl.classList.add('fading');
+    runningMessageTimeout = setTimeout(() => {
+      runningMessage = choose(RUNNING_MESSAGES.filter((message) => message !== runningMessage));
+      statusEl.classList.remove('fading');
+      runningMessageTimeout = null;
+    }, RUNNING_MESSAGE_FADE_MS);
+  }
+
+  function updateRunningMessage() {
+    if (!running || isCooked() || elapsedMs < nextRunningMessageAt) return;
+    nextRunningMessageAt = elapsedMs + RUNNING_MESSAGE_INTERVAL;
+    rotateRunningMessage();
+  }
+
   function start() {
     if (running) return;
     audioUnlocked = true;
     sessionStarted = true;
     running = true;
+    clearRunningMessageFade();
     runningMessage = choose(RUNNING_MESSAGES);
+    nextRunningMessageAt = elapsedMs + RUNNING_MESSAGE_INTERVAL;
     startedAt = performance.now() - elapsedMs;
     syncBubbleSound();
   }
   function stop() {
     if (!running) return;
     elapsedMs = Math.max(0, performance.now() - startedAt);
+    bubbleSoundFadeStartedAt = (!bubblesAudio.paused || bubblesPlaybackRequested) ? performance.now() : null;
+    bubbleSoundFadeStartVolume = bubblesAudio.volume;
     running = false;
     if (elapsedMs > 0) successMessage = choose(SUCCESS_MESSAGES);
+    spawnAcc = 0;
+    clearRunningMessageFade();
     syncBubbleSound();
   }
   function resetRound() {
@@ -132,8 +193,11 @@
     bubbles.forEach((b) => b.el.remove());
     bubbles.length = 0;
     spawnAcc = 0;
+    bubblesAudio.pause();
     bubblesAudio.currentTime = 0;
     bubbleSoundStartMs = null;
+    bubbleSoundFadeStartedAt = null;
+    bubblesPlaybackRequested = false;
     syncBubbleSound();
   }
   function recordRound() {
@@ -152,8 +216,27 @@
     if (!soundEnabled || summaryEl.hidden === false || !sessionStarted) {
       bubblesAudio.pause();
       bubblesPlaybackRequested = false;
+      bubbleSoundFadeStartedAt = null;
       return;
     }
+    if (!running) {
+      if (bubbleSoundFadeStartedAt === null) {
+        bubblesAudio.pause();
+        bubblesPlaybackRequested = false;
+        return;
+      }
+      const progress = Math.min(1, (performance.now() - bubbleSoundFadeStartedAt) / BUBBLE_SOUND_FADE_MS);
+      bubblesAudio.volume = bubbleSoundFadeStartVolume * (1 - progress);
+      if (progress >= 1) {
+        bubblesAudio.pause();
+        bubblesAudio.currentTime = 0;
+        bubblesPlaybackRequested = false;
+        bubbleSoundStartMs = null;
+        bubbleSoundFadeStartedAt = null;
+      }
+      return;
+    }
+    bubbleSoundFadeStartedAt = null;
     if (bubbleSoundStartMs === null) {
       bubblesAudio.volume = 0;
     } else {
@@ -166,7 +249,14 @@
     if (bubblesAudio.paused && !bubblesPlaybackRequested) {
       bubblesPlaybackRequested = true;
       const playback = bubblesAudio.play();
-      if (playback) playback.catch((error) => reportAudioError('bubbles.mp3', error));
+      if (playback) {
+        playback.then(() => {
+          if ((!running || !soundEnabled || summaryEl.hidden === false) && bubbleSoundFadeStartedAt === null) {
+            bubblesAudio.pause();
+            bubblesPlaybackRequested = false;
+          }
+        }).catch((error) => reportAudioError('bubbles.mp3', error));
+      }
     }
   }
 
@@ -195,6 +285,8 @@
       bubblesAudio.pause();
       bubblesAudio.currentTime = 0;
       bubblesPlaybackRequested = false;
+      bubbleSoundStartMs = null;
+      bubbleSoundFadeStartedAt = null;
       return;
     }
     syncBubbleSound();
@@ -282,9 +374,9 @@
 
     flip += ((cooked ? 180 : 0) - flip) * (1 - Math.exp(-dt * 3.2));
     const f = flip / 180;
-    const cy = FROG_CY - 25 * f;
+    const cy = FROG_CY - FROG_FLIP_RISE * f;
     frogEl.setAttribute('transform',
-      'translate(' + (200 + nx).toFixed(2) + ' ' + (cy + ny).toFixed(2) + ') rotate(' + (flip + nr).toFixed(2) + ') translate(0 -22)');
+      'translate(' + (200 + nx).toFixed(2) + ' ' + (cy + ny).toFixed(2) + ') rotate(' + (flip + nr).toFixed(2) + ') translate(0 -22) scale(0.8)');
 
     // colour fade green <-> red
     colorT += ((cooked ? 1 : 0) - colorT) * (1 - Math.exp(-dt * 3));
@@ -356,7 +448,7 @@
   const bubbles = [];
   let spawnAcc = 0;
 
-  // 0 for the first 30 s, then rises linearly to 1 at the time limit.
+  // 0 for the first 25s, then rises linearly to 1 at the time limit.
   function bubbleProgress() {
     const t = elapsedMs / 1000;
     if (t <= BUBBLE_DELAY) return 0;
@@ -416,6 +508,7 @@
     last = now;
     if (running) elapsedMs = Math.max(0, performance.now() - startedAt);
 
+    updateRunningMessage();
     const cooked = isCooked();
     const time = now / 1000;
     syncBubbleSound();
