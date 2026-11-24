@@ -6,6 +6,7 @@
   const MIN_LIMIT = 30;
   const MAX_LIMIT = 3600;
   const DEFAULT_LIMIT = 150;    // 2:30
+  const COOKED_TEXT_FONT_SIZE = 44;
   const BUBBLE_DELAY = 25;      // no bubbles during the first 25s
   const BUBBLE_SOUND_FADE_MS = 800;
   const RUNNING_MESSAGE_INTERVAL = 20_000;
@@ -140,6 +141,23 @@
     return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
   };
   const isCooked = () => elapsedMs > 0 && elapsedMs >= limit * 1000;
+
+  function fitCookedText() {
+    const rect = scene.getBoundingClientRect();
+    const viewBox = scene.viewBox.baseVal;
+    const scale = Math.min(rect.width / viewBox.width, rect.height / viewBox.height);
+    if (!scale) return;
+
+    cookedText.style.fontSize = COOKED_TEXT_FONT_SIZE + 'px';
+    const textWidth = cookedText.getComputedTextLength();
+    const availableWidth = rect.width / scale - 16 - 7;
+    if (textWidth > availableWidth) {
+      cookedText.style.fontSize = COOKED_TEXT_FONT_SIZE * Math.max(0, availableWidth) / textWidth + 'px';
+    }
+  }
+  const sceneResizeObserver = new ResizeObserver(fitCookedText);
+  sceneResizeObserver.observe(scene);
+  document.fonts.ready.then(fitCookedText);
 
   // ---------- controls ----------
   function clearRunningMessageFade() {
@@ -391,7 +409,10 @@
       lastCooked = cooked;
       scene.classList.toggle('cooked', cooked);
       mouthEl.setAttribute('d', cooked ? 'M-24 20 Q0 2 24 20' : 'M-28 4 Q0 26 28 4');
-      if (cooked) cookedText.textContent = choose(COOKED_MESSAGES);
+      if (cooked) {
+        cookedText.textContent = choose(COOKED_MESSAGES);
+        fitCookedText();
+      }
     }
     if (cooked && !previousCooked && soundEnabled && audioUnlocked) {
       cryAudio.currentTime = 0;

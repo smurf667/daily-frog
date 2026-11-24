@@ -15,7 +15,7 @@ This was inspired by the unsurpassed [Daily Toast](https://dailytoast.io/).
 - Sound is disabled by default and can be enabled with the speaker button. Bubbles start playing at 10% when visual bubbles appear and grow louder until the time limit; the frog cries when it flips and makes a sound when it blinks. Browsers require a user gesture before playing audio.
 - Visual bubbles begin after 25s and increase until the limit, then stay at the maximum rate.
 - The running status message changes to a random message every 20s with a brief fade.
-- At the limit the frog turns red, flips feet-up, gets X eyes, and a warning message appears.
+- At the limit the frog turns red, flips feet-up, gets X eyes, and a warning message appears; long warning text shrinks to fit the available width.
 - **Finish** ends the session and shows the summary. Rounds with 0:00 elapsed are not counted.
 - The frog is an original SVG drawing (no external assets).
 
